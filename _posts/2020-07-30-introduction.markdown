@@ -35,7 +35,7 @@ The HVMI engine is a standalone library, self-contained (it has no explicit exte
 
 Supported hypervisors include our internally built Napoca hypervisor TODO ref, and the well-known open-source hypervisors Xen and KVM. Using the Napoca hypervisor, the HVMI engine runs directly inside VMX root, alongside the HV. In Xen and KVM, the HVMI engine runs as a regular user-mode process inside a special VM (or domain), or even dom0. The general architecture of HVMI is illustrated in the following image:
 
-![General HVMI architecture on Xen/KVM](assets/architecture.png)
+![General HVMI architecture on Xen/KVM](({{site.url}}/assets/architecture.png))
 
 From a functional perspective, HVMI is an event-driven library. When introspection is enabled for a guest VM, HVMI starts by identifying the guest operating system type, version, to find various important structures inside its memory. This process is asynchronous, meaning that once the initialization function returns, there’s no guarantee that HVMI has finished initialization; some parts of the guest introspection process occur when various events take place (for example, when CR3 is written). Once introspection is enabled, HVMI kicks-in when interesting events take-place within the guest; when a process is created or terminated, when a new memory region is allocated inside a protected process, or when memory accesses take place inside a protected region. 
 
