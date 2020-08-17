@@ -275,8 +275,10 @@ cp default.json <uuid>.json
 
 ```shell
 sudo su -
-LD_LIBRARY_PATH=/usr/local/lib /usr/local/bin/hvmid
+LD_LIBRARY_PATH=/usr/local/lib /usr/local/bin/hvmid --start
 ```
+
+Use `--kill` to stop the daemon.
 
 ## Power on the target guest VM
 

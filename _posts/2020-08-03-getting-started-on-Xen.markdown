@@ -80,7 +80,13 @@ sudo make install
 All that's left to do is to run `hvmid` and start a VM to be introspected:
 
 ```shell
-./hvmid
+./hvmid --start
+```
+
+To stop the daemon use:
+
+```shell
+./hvmid --kill
 ```
 
 You can use `journalctl -t hvmid` to check the logs. You should see something like this (note that I will skip some uninteresting log lines):
