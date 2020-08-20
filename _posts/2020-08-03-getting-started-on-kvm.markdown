@@ -123,6 +123,8 @@ cd libbdvmi
 mkdir build
 cd build
 ../configure --prefix=/usr/local --enable-kvmi --enable-optimize
+make
+sudo make install
 ```
 
 ### Install hvmi
