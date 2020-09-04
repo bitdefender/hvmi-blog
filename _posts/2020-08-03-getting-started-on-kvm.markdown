@@ -271,7 +271,7 @@ After powering up the VM hosting HVMI we must create a dedicated policy for the 
 
 ```shell
 sudo su -
-/usr/local/etc/hvmid/policies/
+cd /usr/local/etc/hvmid/policies/
 cp default.json <uuid>.json
 ```
 
