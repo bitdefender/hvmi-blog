@@ -6,6 +6,8 @@ date:   2020-08-10 11:53:00 +0300
 
 For a Xen guide check [HVMI demo setup on Xen](/blog/2020/08/10/getting-started-on-Xen.html).
 
+Packer templates can be found in the [kvmi-templates](https://github.com/mdontu/kvmi-templates) repository.
+
 ## High level plan
 
 * Install Ubuntu Linux 20.04 on the host
