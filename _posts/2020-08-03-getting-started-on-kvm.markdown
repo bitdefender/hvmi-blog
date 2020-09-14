@@ -118,7 +118,7 @@ sudo make install
 ### Install libbdvmi
 
 ```shell
-sudo apt install libboost-all-dev libxen-dev
+sudo apt install libboost-all-dev libxen-dev pkg-config uuid-dev
 git clone https://github.com/bitdefender/libbdvmi.git
 cd libbdvmi
 ./bootstrap
