@@ -1,5 +1,5 @@
 ---
-layout: default
+layout: post
 title:  "A Gentle Introduction to HVMI"
 date:   2020-07-30 14:00:00 +0300
 categories: introspection

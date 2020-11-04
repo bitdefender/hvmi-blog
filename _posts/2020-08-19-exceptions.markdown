@@ -1,5 +1,5 @@
 ---
-layout: default
+layout: post
 title:  "Manually adding an exception using the introspection log"
 date:   2020-08-19 13:00:00 +0300
 ---
