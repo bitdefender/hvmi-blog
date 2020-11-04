@@ -131,7 +131,7 @@ The steps listed above will yield the linear address used by the instruction ope
 
 bddisasm has been created in an extensible way, making the addition of new instructions trivial, as long as they don't use a new encoding scheme, or new registers. The instructions database is contained in several `.dat` files located inside the `isagenerator/instructions` project of the bddisasm repo. While sufficient information about this project is already provided in the [readme](https://github.com/bitdefender/bddisasm/blob/master/isagenerator/README.md), we will only show a quick demonstration about adding new instructions to bddisasm.
 
-Let's first pick up an encoding that is not currently used by any instruction - `0F04`. If we try to decode this isntruction, we will see that bddisasm fails:
+Let's first pick up an encoding that is not currently used by any instruction - `0F04` (although it should be noted that it was used on 286 by `LOADALL`). If we try to decode this instruction, we will see that bddisasm fails:
 ```
 C:\>disasm -b64 -h 0F04
 0000000000000000 0f                              db 0x0f (0x80000002)
