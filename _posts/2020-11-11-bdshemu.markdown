@@ -11,7 +11,7 @@ Detecting exploits is one of the major strengths of Hypervisor Memory Introspect
 
 In theory, intercepting execution attempts from memory regions such as the stack or the heap should be enough to prevent most of the exploits. Real life is often more complicated, and there are many cases where legit software uses techniques that may resemble on attack - Just In Time compilation (JIT) in browsers is one good example. In addition, an attacker may store its payload in other memory regions, outside the stack or the heap, so a method of discerning good code from bad code is useful.
 
-We will talk in this blog post about the Bitdefender Shellcode Emulator, or [bdshemu](https://github.com/bitdefender/bddisasm) for short. bdshemu is a library capable of emulating basic x86 instructions, while observing shellcode-like behavior. Legitimate code, such as JIT code, will look different compared to a traditional shellcode, so this is what bdshemu is trying to determine: whether the emulated code behaves like a shellcode or not.
+We will talk in this blog post about the Bitdefender Shellcode Emulator, or [bdshemu](https://github.com/bitdefender/bddisasm) for short. bdshemu is a library capable of emulating basic x86  instructions (in all modes - 16, 32 and 64 bit), while observing shellcode-like behavior. Legitimate code, such as JIT code, will look different compared to a traditional shellcode, so this is what bdshemu is trying to determine: whether the emulated code behaves like a shellcode or not.
 
 ## bdshemu Overview
 
