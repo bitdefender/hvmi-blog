@@ -1,0 +1,201 @@
+---
+layout: post
+title:  "bdshemu: The Bitdefender shellcode emulator"
+date:   2020-11-11 09:00:00 +0200
+author: Andrei Lutas
+---
+
+## Introduction
+
+Detecting exploits is one of the major strengths of Hypervisor Memory Introspection (HVMI). The ability to monitor guest physical memory pages against different kinds of accesses, such as write or execute, allows HVMI to impose restrictions on critical memory regions: for example, stack or heap pages can be marked as being non-executable at the EPT level, so when an exploit manages to gain arbitrary code execution, the introspection logic would step in and block the execution of the shellcode.
+
+In theory, intercepting execution attempts from memory regions such as the stack or the heap should be enough to prevent most of the exploits. Real life is often more complicated, and there are many cases where legit software uses techniques that may resemble on attack - Just In Time compilation (JIT) in browsers is one good example. In addition, an attacker may store its payload in other memory regions, outside the stack or the heap, so a method of discerning good code from bad code is useful.
+
+We will talk in this blog post about the Bitdefender Shellcode Emulator, or [bdshemu](https://github.com/bitdefender/bddisasm) for short. bdshemu is a library capable of emulating basic x86 instructions, while observing shellcode-like behavior. Legitimate code, such as JIT code, will look different compared to a traditional shellcode, so this is what bdshemu is trying to determine: whether the emulated code behaves like a shellcode or not.
+
+## bdshemu Overview
+
+bdshemu is a library written in C, and is part of the bddisasm project (and of course, it makes use of bddisasm for instruction decoding). The bdshemu library is built to emulate x86 code only, so it has no support for API calls. In fact, the emulation environment is highly restricted and stripped down, and there are only two memory regions available:
+
+* The page(s) containing the emulated code;
+* The stack;
+
+Both of these memory regions are virtualized, meaning that they are in fact copies of the actual memory being emulated, so modifications made to them don't affect the actual system state. Any access made by the emulated code outside of these two areas (which we will call the shellcode and the stack, respectively) will trigger immediate emulation termination. For example, an API call will automatically cause a branch outside the shellcode region, thus terminating emulation. However, in bdshemu, all we care about is instruction-level behavior of the code, which is enough to tell us whether the code is malicious or not.
+
+While bdshemu provides the main infrastructure for detecting shellcodes inside a guest operating-system, it is worth noting that this is not the only way HVMI determines that execution of a certain page is malicious - two other important indicators are used:
+
+* The executed page is located on the stack - this is common with stack-based vulnerabilities;
+* The stack is pivoted - when a page is first executed and the `RSP` register points outside the normal stack allocated for the thread;
+
+These two indicators are enough on their own to trigger an exploit detection. If these are not triggered, bdshemu is used to take a good look at the executed code, and decide if it should be blocked or not.
+
+## bdshemu Architecture
+
+bdshemu is created as a standalone C library, and it only depends on bddisasm. Working with bdshemu is fairly simple, as just like bddisasm, it is a single-API library:
+```c
+SHEMU_STATUS
+ShemuEmulate(
+    SHEMU_CONTEXT *Context
+    );
+```
+
+The emulator expects a single `SHEMU_CONTEXT` argument, containing all the needed information in order to emulate the suspicious code. This context is split in two sections - input parameters and output parameters. The input parameters must be supplied by the caller, and they contain information such as the code to be emulated, or initial register values. The output parameters contain information such as what shellcode indicators bdshemu detected. All these fields are well documented in the source-code.
+
+Initially, the context is filled in with the following main information (please note that emulation outcome may change depending on the value of the provided registers and stack):
+
+* Input registers, such as segments, general purpose registers, MMX and SSE registers; they can be left 0, if they are not known, or if they are irrelevant;
+* Input code, which is the actual code to be emulated;
+* Input stack, which can contain actual stack contents, or can be left 0; 
+* Environment info, such as mode (32 or 64 bit), or ring (0, 1, 2 or 3);
+* Control parameters, such as minimum stack-string length, minimum NOP sled length or the maximum number of instructions that should be emulated;
+
+The main output parameter is the `Flags` field, which contains a list of shellcode indicators detected during the emulation. Generally, a non-zero value of this field strongly suggests that the emulate code is, in fact, a shellcode.
+
+bdshemu is built as a plain, quick and simple x86 instruction emulator: since it only works with the shellcode itself and a small virtual stack, it doesn't have to emulate any architectural specifics - interrupts or exceptions, descriptor tables, page-tables, etc. In addition, since we only deal with the shellcode and stack memory, bdshemu does not do memory access checks, since it doesn't even allow accesses to other addresses. The only state apart from the registers that can be accessed is the shellcode itself and the stack, and both are copies of the actual memory contents - the system state is never modified during the emulation, only the provided `SHEMU_CONTEXT` is. This makes bdshemu extremely fast, simple, and lets us focus on its main purpose: detecting shellcodes. 
+
+As far as instruction support goes, bdshemu supports all the basic x86 instructions, such as branches, arithmetic, logic, shift, bit manipulation, multiplication/divison, stack access and data transfer instructions. In addition, it also has support for other instructions, such as some basic MMX or AVX instructions - `PUNPCKLBW` or `VPBROADCAST` are two good examples. 
+
+## bdshemu Detection Techniques
+
+In order to determine whether an emulated piece of code behaves like a shellcode, there are several indicators bdshemu uses.
+
+### NOP Sled
+
+This is the classic presentation of shellcodes; since the exact entry point of the shellcode when gaining code execution may be unknown, attackers usually prepend a long sequence of `NOP` instructions, encoding `0x90`. The parameters for the NOP-sled length can be controlled when calling the emulator, via the `NopThreshold` context field. The default value is `SHEMU_DEFAULT_NOP_THRESHOLD`, which is `75`, meaning that minimum 75% of all the emulated instruction must be `NOP`.
+
+### RIP Load
+
+Shellcodes are designed to work correctly no matter what address they're loaded at. This means that the shellcode has to determine, dynamically, during runtime, the address it was loaded at, so absolute addressing can be replaced with some form of relative addressing. This is typically achieved by retrieving the value of the instruction pointer using well-known techniques:
+
+* `CALL $+5/POP ebp` - executing these two instructions will result in the value of the instruction pointer being stored in the `ebp` register; data can then be accessed inside the shellcode using offsets relative to the `ebp` value;
+* `FNOP/FNSTENV [esp-0xc]/POP edi` - the first instruction is any FPU instruction (not necessarily `FNOP`), and the second instruction, `FNSTENV` saves the FPU environment on the stack; the third instruction will retrieve the `FPU Instruction Pointer` from `esp-0xc`, which is part of the FPU environment, and contains the address of the last FPU executed - in our case, `FNOP`; from there on, addressing relative to the `edi` can be used to access shellcode data;
+
+Internally, bdshemu keeps track of all the instances of the instruction pointer being saved on the stack. Later loading that instruction pointer from the stack in any way will result in triggering this detection. Due to the way bdshemu keeps track of the saved instruction pointers, it doesn't matter when, where or how the shellcode attempts to load the RIP in a register and use it, bdshemu will always trigger a detection.
+
+In 64 bit, RIP-relative addressing can be used directly, since the instruction encoding allows it. However, surprisingly, a large number of shellcodes still use a classic method of retrieving the instruction pointer (generally the `CALL/POP` technique), which is somehow weird, but it probably indicated that 32 bit shellcodes were ported to 64 bit with minimal modifications.
+
+### Write Self
+
+Most often, shellcodes come in encoded or encrypted forms, in order to avoid certain bad characters (for example, `0x00` in a shellcode that should resemble a string may break the exploit) or to avoid detection by security technologies (for example, AV scanners). This means that during runtime, the shellcode must decode itself (usually in-place), by modifying its own contents, and then executing the plain-text code. Typical methods of decoding involve `XOR` or `ADD` based decryption algorithms.
+
+Certainly, bdshemu follows this kind of behavior, and keeps track internally of each modified byte inside the shellcode. Whenever the suspected shellcode writes any portion of itself, and then it executes it, the self-write detection will be triggered.
+
+### TIB Access
+
+Once a shellcode has gained code execution, it needs to locate several functions inside various modules, in order to carry its actual payload (for example, downloading a file, or creating a process). On Windows, the most common way of doing this is by parsing the user-mode loader structures, in order to locate the addresses where the required modules were loaded, and then locate the needed functions inside these modules. The sequence of structures the shellcode will access is:
+
+1. The Thread Environment Block (`TEB`), which is located at `fs:[0]` (32 bit thread) or `gs:[0]` (64 bit thread);
+2. The Process Environment Block (`PEB`), which is located at `TEB+0x30` (32 bit) or `TEB+0x60` (64 bit)
+3. The Loader information (`PEB_LDR_DATA`), located inside `PEB`
+
+Inside the `PEB_LDR_DATA`, there are several lists which contain the loaded modules. The shellcode will iterate through these lists in order to locate the much needed libraries and functions.
+
+On each memory access, bdshemu will see if the shellcode tries to access the `PEB` field inside `TEB`. bdshemu will keep track of memory accesses even if they are made without the classic `fs/gs` segment prefixes - as long as an access to the `PEB` field inside `TEB` is identified, the TIB access detection will be triggered.
+
+### Direct SYSCALL invocation
+
+Legitimate code will rely on several libraries in order to invoke operating system services - for example, in order to create a process, normal code would call one of the `CreateProcess` functions on Windows. It is uncommon for legitimate code to directly invoke a SYSCALL, since the SYSCALL interface may change over time. For this reason, bdshemu will trigger the SYSCALL detection whenever it sees that a suspected shellcode directly invokes a system service using the `SYSCALL/SYSENTER/INT` instructions.
+
+### Stack Strings
+
+Another common way for shellcodes to mask their contents is to dynamically construct strings on the stack. This may eliminate the need to write Position Independent Code (PIC), since the shellcode would dynamically build the desired strings on the stack, instead of referencing them inside the shellcode as regular data. Typical ways of achieving this is by saving the string contents on the stack, and then reference the string using the stack pointer:
+```asm
+push 0x6578652E
+push 0x636C6163
+```
+
+The code above would end up storing the string `calc.exe` on the stack, which can then be used as a normal string throughout the shellcode.
+
+For each value saved on the stack that resembles a string, bdshemu keeps track of the total length of the string constructed on the stack. Once the threshold indicated by the `StrLength` field inside the context is exceeded, the stack string detection will be triggered. The default value for this field is `SHEMU_DEFAULT_STR_THRESHOLD`, which is equal to `8`, meaning that dynamically constructing a string equal to or longer than 8 characters on the stack will trigger this detection.
+
+
+## bdshemu Detection Techniques for Kernel-Mode shellcodes
+
+While the above mentioned techniques are general and can be applied to any shellcode, on any operating system and on both 32 or 64 bit (except for the TIB access detection, which is Windows specific), bdshemu also has the capability of determining some kernel-specific shellcode behavior.
+
+### KPCR Access
+
+The Kernel Processor Control Region (`KPCR`) is a per-processor structure on Windows systems that contains lots of information critical for the kernel, but which may be useful for an attacker as well. Commonly, the shellcode would wish to reference the currently executing thread, which can be retrieved by accessing the `KPCR` structure, at offset `0x124` on 32 bit systems and `0x188` on 64 bit systems.
+
+Just like the TIB access detection technique, bdshemu keeps track of memory accesses, and when the emulated code reads the current thread from the `KPCR`, it will trigger the `KPCR` access detection.
+
+### SWAPGS execution
+
+`SWAPGS` is a system instruction that is only executed when transitioning from user-mode to kernel-mode and vice-versa. Sometimes, due to the specifics of certain kernel exploits, the attacker will end up needing to execute `SWAPGS` - for example, the EternalBlues kernel payload famously intercepted the SYSCALL handler, so it needed to execute `SWAPGS` when a SYSCALL took place, just like an ordinary system call would do.
+
+bdshemu will trigger the SWAPGS detection whenever it encounters the `SWAPGS` instruction being executed by a suspected shellcode.
+
+### MSR read/write
+
+Some shellcodes (such as the aforementioned EternalBlue kernel payload) will have to modify the SYSCALL handler in order to migrate to a stable execution environment (for example, because the initial shellcode executes at a high IRQL, which needs to be lowered before calling useful routines). This is done by modifying the SYSCALL MSRs using the `WRMSR` instruction, and then waiting for a syscall to execute (which is at lower IRQL) to continue execution (this is also where the SWAPGS technique comes in handy, since `SWAPGS` must be executed after each SYSCALL on 64 bit).
+
+In addition, in order to locate the kernel image in memory, and, subsequently, useful kernel routines, a quick and easy technique is by querying the SYSCALL MSR (which normally points to the SYSCALL handler inside the kernel image), and then walk pages backwards until the beginning of the kernel image is found.
+
+bdshemu will trigger the MSR access detection whenever the suspected shellcode accesses the SYSCALL MSRs (both on 32 or 64 bit mode).
+
+## Example
+
+The bdshemu project contains some synthetic test-cases, but the best way to demonstrate its functionality is by using real-life shellcodes. In this regard, Metasploit is remarkable at generating different kinds of payloads, using all kind of encoders. Let's take the following shellcode as a purely didactic example:
+
+```
+DA C8 D9 74 24 F4 5F 8D 7F 4A 89 FD 81 ED FE FF
+FF FF B9 61 00 00 00 8B 75 00 C1 E6 10 C1 EE 10 
+83 C5 02 FF 37 5A C1 E2 10 C1 EA 10 89 D3 09 F3 
+21 F2 F7 D2 21 DA 66 52 66 8F 07 6A 02 03 3C 24 
+5B 49 85 C9 0F 85 CD FF FF FF 1C B3 E0 5B 62 5B 
+62 5B 02 D2 E7 E3 27 87 AC D7 9C 5C CE 50 45 02 
+51 89 23 A1 2C 16 66 30 57 CF FB F3 9A 8F 98 A3 
+B8 62 77 6F 76 A8 94 5A C6 0D 4D 5F 5D D4 17 E8 
+9C A4 8D DC 6E 94 6F 45 3E CE 67 EE 66 3D ED 74 
+F5 97 CF DE 44 EA CF EB 19 DA E6 76 27 B9 2A B8 
+ED 80 0D F5 FB F6 86 0E BD 73 99 06 7D 5E F6 06 
+D2 07 01 61 8A 6D C1 E6 99 FA 98 29 13 2D 98 2C 
+48 A5 0C 81 28 DA 73 BB 2A E1 7B 1E 9B 41 C4 1B 
+4F 09 A4 84 F9 EE F8 63 7D D1 7D D1 7D 81 15 B0 
+9E DF 19 20 CC 9B 3C 2E 9E 78 F6 DE 63 63 FE 9C 
+2B A0 2D DC 27 5C DC BC A9 B9 12 FE 01 8C 6E E6 
+6E B5 91 60 F2 01 9E 62 B0 07 C8 62 C8 8C
+```
+
+Saving this as a binary file as `shellcode.bin` and then viewing its contents yields a densely packed chunk of code, highly indicative of an encrypted shellcode:
+
+![The shellcode viewed in hex & binary](/blog/assets/shellcode1.png)
+
+Using the disasmtool provided in the bddisasm project, one can use the `-shemu` option to run the shellcode emulator on the input. 
+```console
+disasmtool -b32 -shemu -f shellcode.bin
+```
+
+Running this on our shellcode will display step-by-step information about each emulated instruction, but because that trace is long, let's jump directly to the end of if:
+
+```console
+Emulating: 0x0000000000200053 XOR       eax, eax
+        RAX = 0x0000000000000000 RCX = 0x0000000000000000 RDX = 0x000000000000ee00 RBX = 0x0000000000000002
+        RSP = 0x0000000000100fd4 RBP = 0x0000000000100fd4 RSI = 0x0000000000008cc8 RDI = 0x000000000020010c
+        R8  = 0x0000000000000000 R9  = 0x0000000000000000 R10 = 0x0000000000000000 R11 = 0x0000000000000000
+        R12 = 0x0000000000000000 R13 = 0x0000000000000000 R14 = 0x0000000000000000 R15 = 0x0000000000000000
+        RIP = 0x0000000000200055 RFLAGS = 0x0000000000000246
+Emulating: 0x0000000000200055 MOV       edx, dword ptr fs:[eax+0x30]
+Emulation terminated with status 0x00000001, flags: 0xe, 0 NOPs
+        SHEMU_FLAG_LOAD_RIP
+        SHEMU_FLAG_WRITE_SELF
+        SHEMU_FLAG_TIB_ACCESS
+```
+
+We can see that the last emulated instruction is `MOV       edx, dword ptr fs:[eax+0x30]`, which is a `TEB` access instruction, but which also triggers emulation to be stopped, since it is an access outside shellcode memory (and remember, bdshemu will stop at the first memory access outside the shellcode or the stack). Moreover, this small shellcode (generated using Metasploit) triggered 3 detections in bdshemu:
+
+* `SHEMU_FLAG_LOAD_RIP` - the shellcode loads the `RIP` inside a general-purpose register, to locate its position in memory;
+* `SHEMU_FLAG_WRITE_SELF` - the shellcode descrypts itself, and then executes decrypted pieces;
+* `SHEMU_FLAG_TIB_ACCESS` - the shellcode goes on to access the `PEB`, in order to locate important libraries and functions;
+
+These indicators are more than enough to conclude that the emulated code is, without a doubt, a shellcode. What's even more awesome about bdshemu is that generally, at the end of the emulation, the memory will contain the decrypted form of the shellcode. disasmtool is nice enough to save the shellcode memory once emulation is done - a new file, named `shellcode.bin_decoded.bin` is created which now contains the decoded shellcode; let's take a look at it:
+
+![The emulated shellcode](/blog/assets/shellcode2.png)
+
+Looking at the decoded shellcode, one can immediately see not only that it is different, but that is plain text - a keen eye will quickly identify the `calc.exe` string at the end of the shellcode, hinting us that it is a classic `calc.exe` spawning shellcode.
+
+## Conclusions
+
+We presented in this blog-post the Bitdefender shellcode emulator, which is a critical part of HVMI's exploit detection technology. bdshemu is built to detect shellcode indicators at the binary-code level, without the need to emulate complex API calls, complex memory layout or complex architectural entities, such as page-tables, descriptor tables, etc. - bdshemu focuses on what matters most, emulating the instructions and determining if they behave like a shellcode. 
+
+Due to its simplicity, bdshemu works for shellcodes aimed towards any operating system, as most of the detection techniques are specific to instruction-level behavior, instead of high level behavior such as API calls. In addition, it works on both 32 and 64 bit code, as well as with user or kernel specific code.

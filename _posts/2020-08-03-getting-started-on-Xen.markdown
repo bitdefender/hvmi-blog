@@ -2,6 +2,7 @@
 layout: post
 title:  "HVMI demo setup on Xen"
 date:   2020-08-10 11:52:00 +0300
+author: Cristi Anichitei
 ---
 
 In the [previous blog post](/blog/introspection/2020/07/30/introduction.html) we talked about what HVMI is and how it works, and now we will talk about how to get the example daemon working with Xen 4.11. We will be using Ubuntu 20.04 as a development environment.

@@ -2,6 +2,7 @@
 layout: post
 title:  "Adding support for a new operating system"
 date:   2020-08-31 11:00:00 +3
+author: Eduard Muresan, Bogdan Bosinta
 ---
 
 ## Introduction

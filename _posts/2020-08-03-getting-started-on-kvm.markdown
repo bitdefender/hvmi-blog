@@ -2,6 +2,7 @@
 layout: post
 title:  "HVMI demo setup on KVM"
 date:   2020-08-10 11:53:00 +0300
+author: Cristi Anichitei
 ---
 
 For a Xen guide check [HVMI demo setup on Xen](/blog/2020/08/10/getting-started-on-Xen.html).

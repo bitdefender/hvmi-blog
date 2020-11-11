@@ -2,6 +2,7 @@
 layout: post
 title:  "bddisasm: The Bitdefender x86 Disassembler"
 date:   2020-11-04 14:00:00 +0200
+author: Andrei Lutas
 ---
 
 ## Introduction
@@ -133,7 +134,7 @@ bddisasm has been created in an extensible way, making the addition of new instr
 
 Let's first pick up an encoding that is not currently used by any instruction - `0F04` (although it should be noted that it was used on 286 by `LOADALL`). If we try to decode this instruction, we will see that bddisasm fails:
 ```
-C:\>disasm -b64 -h 0F04
+C:\>disasmtool -b64 -h 0F04
 0000000000000000 0f                              db 0x0f (0x80000002)
 ```
 
@@ -162,19 +163,19 @@ Let's break down this specification:
 
 Let's now rebuild the decoding tree by building the `isagenerator` project in VisualStudio, or by running `make`, followed by rebuilding the `bddisasm` library and the `disasmtool`. Let's now try to decode the instruction again:
 ```
-C:\>disasm -b64 -h 0F04
+C:\>disasmtool -b64 -h 0F04
 0000000000000000 0f                              db 0x0f (0x80000001)
 ```
 
 We now get a different error: `0x80000001` which means `ND_STATUS_BUFFER_TOO_SMALL` - this indicates that there is a valid instruction for this encoding, but we didn't supply enough bytes to decode it. Indeed, we did not, as we only specified the opcode, without the modrm byte. Let's try again, using the modrm byte as well this time:
 ```
-C:\>disasm -b64 -h 0F0400
+C:\>disasmtool -b64 -h 0F0400
 0000000000000000 0f0400                          BDDISASM  eax, dword ptr [rax]
 ```
 
 As you can see, the instruction has been successfully decoded! Playing with different encodings yield the expected instruction:
 ```
-C:\>disasm -b64 -h 0F0400660F0400480F0400670F0400F30F0400
+C:\>disasmtool -b64 -h 0F0400660F0400480F0400670F0400F30F0400
 0000000000000000 0f0400                          BDDISASM  eax, dword ptr [rax]
 0000000000000003 660f0400                        BDDISASM  ax, word ptr [rax]
 0000000000000007 480f0400                        BDDISASM  rax, qword ptr [rax]
@@ -189,7 +190,7 @@ BDDISASM        Gv,Ev        Fv                        [            0x0F 0x04 /r
 
 Running the disassembler once again, with the extended information option, yields this:
 ```
-C:\>disasm -b64 -h 0F0400 -exi
+C:\>disasmtool -b64 -h 0F0400 -exi
 0000000000000000 0f0400                          BDDISASM  eax, dword ptr [rax]
         DSIZE: 32, ASIZE: 64, VLEN: -
         ISA Set: UNKNOWN, Ins cat: UNKNOWN, CET tracked: no
