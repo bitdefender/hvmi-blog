@@ -89,6 +89,7 @@ Prepare the build environment using this [official documentation](https://wiki.u
 
 ```shell
 git clone https://github.com/KVM-VMI/kvm.git
+cd kvm
 git checkout kvmi-v7
 make oldconfig
 scripts/config --enable KVM_INTROSPECTION
@@ -160,6 +161,7 @@ You should poweroff the VM at this point as we will reconfigure it later.
 ```shell
 sudo apt build-dep qemu-kvm
 git clone https://github.com/KVM-VMI/qemu.git
+cd qemu
 git checkout kvmi-v7
 mkdir build
 cd build
