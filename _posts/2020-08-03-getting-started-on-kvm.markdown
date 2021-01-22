@@ -39,6 +39,7 @@ Prepare the build environment using this [official documentation](https://wiki.u
 
 ```shell
 git clone https://github.com/KVM-VMI/kvm.git
+cd kvm
 git checkout kvmi-v7
 make oldconfig
 scripts/config --enable KVM_INTROSPECTION
