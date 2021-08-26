@@ -41,13 +41,17 @@ Prepare the build environment using this [official documentation](https://wiki.u
 git clone https://github.com/KVM-VMI/kvm.git
 cd kvm
 git checkout kvmi-v7
-make oldconfig
-scripts/config --enable KVM_INTROSPECTION
-scripts/config --enable KVM_INTROSPECTION_GUEST
-scripts/config --enable REMOTE_MAPPING
-scripts/config --disable CONFIG_KSM
+cp /boot/config-$(uname -r) .config
+scripts/config --enable  KVM
+scripts/config --enable  KVM_INTEL
+scripts/config --enable  KVM_INTROSPECTION
+scripts/config --enable  REMOTE_MAPPING
 scripts/config --disable TRANSPARENT_HUGEPAGE
-make
+scripts/config --disable SYSTEM_TRUSTED_KEYS
+scripts/config --disable MODULE_SIG_KEY
+scripts/config --disable SECURITY_APPARMOR
+make olddefconfig
+make -j $(nproc)
 sudo su
 INSTALL_MOD_STRIP=1 make modules_install
 make install
@@ -82,6 +86,8 @@ sudo apt install libvirt-daemon libvirt-daemon-system libvirt-daemon-system-syst
 
 ## Create an Ubuntu Linux 20.04 guest VM
 
+You'll need a 40GB disk image.
+
 ### Install the kernel build dependencies
 
 Prepare the build environment using this [official documentation](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel).
@@ -92,13 +98,17 @@ Prepare the build environment using this [official documentation](https://wiki.u
 git clone https://github.com/KVM-VMI/kvm.git
 cd kvm
 git checkout kvmi-v7
-make oldconfig
-scripts/config --enable KVM_INTROSPECTION
-scripts/config --enable KVM_INTROSPECTION_GUEST
-scripts/config --enable REMOTE_MAPPING
-scripts/config --disable CONFIG_KSM
-scripts/config --disable TRANSPARENT_HUGEPAGE
-make
+cp /boot/config-$(uname -r) .config
+make kvmconfig
+scripts/config --enable  DEV_DAX
+scripts/config --enable  DEV_DAX_KMEM
+scripts/config --enable  MEMORY_HOTPLUG
+scripts/config --enable  ACPI_HOTPLUG_MEMORY
+scripts/config --enable  KVM_INTROSPECTION_GUEST
+scripts/config --disable SYSTEM_TRUSTED_KEYS
+scripts/config --disable MODULE_SIG_KEY
+make olddefconfig
+make -j $(nproc)
 sudo su
 INSTALL_MOD_STRIP=1 make modules_install
 make install
@@ -222,8 +232,21 @@ Using `virsh` edit the VM configuration as follows:
   ```xml
   <qemu:commandline>
     <qemu:arg value='-device'/>
-    <qemu:arg value='vhost-vsock-pci,id=bitdefender-vsock,guest-cid=321'/>
+    <qemu:arg value='vhost-vsock-pci,id=vsock,guest-cid=321'/>
+    <qemu:arg value='-chardev'/>
+    <qemu:arg value='socket,id=hvmi-socket,cid=321,port=1234,reconnect=3'/>
+    <qemu:arg value='-chardev'/>
+    <qemu:arg value='socket,id=hvmi-mem-socket,path=/var/lib/libvirt/qemu/mem-introspection-sock,server=on,wait=off'/>
+    <qemu:arg value='-object'/>
+    <qemu:arg value='introspection,id=hvmi,chardev=hvmi-socket,chardev-memintro=hvmi-mem-socket'/>
   </qemu:commandline>
+  ```
+
+* if this VM has 2 vCPUs and 8GB RAM and it should be able to introspect 50 guests with a maximum total memory of 500GB, you must add a `maxMemory` node (slots=3*max_guest, maxMemory=this_vm+max_total_memory) and a `NUMA` child node to the current `cpu` node (`<cpu .../>`):
+
+  ```xml
+  <maxMemory slots='150' unit='GiB'>508</maxMemory>
+  <cpu ...><numa><cell id='0' cpus='0-1' memory='8' unit='GiB'/></numa></cpu>
   ```
 
 ## Install a target (Windows, Linux) guest VM
@@ -263,9 +286,11 @@ Using `virsh` edit the VM configuration as follows:
   ```xml
   <qemu:commandline>
     <qemu:arg value='-chardev'/>
-    <qemu:arg value='socket,id=bitdefender-socket,cid=321,port=1234,reconnect=3'/>
+    <qemu:arg value='socket,id=hvmi-socket,cid=321,port=1234,reconnect=3'/>
+    <qemu:arg value='-chardev'/>
+    <qemu:arg value='socket,id=hvmi-mem-socket,path=/var/lib/libvirt/qemu/mem-introspection-sock,disconnected'/>
     <qemu:arg value='-object'/>
-    <qemu:arg value='introspection,id=bitdefender-kvmi,chardev=bitdefender-socket'/>
+    <qemu:arg value='introspection,id=hvmi,chardev=hvmi-socket,chardev-memsrc=hvmi-mem-socket'/>
   </qemu:commandline>
   ```
 
