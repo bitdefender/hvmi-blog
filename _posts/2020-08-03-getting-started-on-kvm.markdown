@@ -41,13 +41,17 @@ Prepare the build environment using this [official documentation](https://wiki.u
 git clone https://github.com/KVM-VMI/kvm.git
 cd kvm
 git checkout kvmi-v7
-make oldconfig
-scripts/config --enable KVM_INTROSPECTION
-scripts/config --enable KVM_INTROSPECTION_GUEST
-scripts/config --enable REMOTE_MAPPING
-scripts/config --disable CONFIG_KSM
+cp /boot/config-$(uname -r) .config
+scripts/config --enable  KVM
+scripts/config --enable  KVM_INTEL
+scripts/config --enable  KVM_INTROSPECTION
+scripts/config --enable  REMOTE_MAPPING
 scripts/config --disable TRANSPARENT_HUGEPAGE
-make
+scripts/config --disable SYSTEM_TRUSTED_KEYS
+scripts/config --disable MODULE_SIG_KEY
+scripts/config --disable SECURITY_APPARMOR
+make olddefconfig
+make -j $(nproc)
 sudo su
 INSTALL_MOD_STRIP=1 make modules_install
 make install
@@ -82,6 +86,8 @@ sudo apt install libvirt-daemon libvirt-daemon-system libvirt-daemon-system-syst
 
 ## Create an Ubuntu Linux 20.04 guest VM
 
+You'll need a 40GB disk image.
+
 ### Install the kernel build dependencies
 
 Prepare the build environment using this [official documentation](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel).
@@ -92,13 +98,17 @@ Prepare the build environment using this [official documentation](https://wiki.u
 git clone https://github.com/KVM-VMI/kvm.git
 cd kvm
 git checkout kvmi-v7
-make oldconfig
-scripts/config --enable KVM_INTROSPECTION
-scripts/config --enable KVM_INTROSPECTION_GUEST
-scripts/config --enable REMOTE_MAPPING
-scripts/config --disable CONFIG_KSM
-scripts/config --disable TRANSPARENT_HUGEPAGE
-make
+cp /boot/config-$(uname -r) .config
+make kvmconfig
+scripts/config --enable  DEV_DAX
+scripts/config --enable  DEV_DAX_KMEM
+scripts/config --enable  MEMORY_HOTPLUG
+scripts/config --enable  ACPI_HOTPLUG_MEMORY
+scripts/config --enable  KVM_INTROSPECTION_GUEST
+scripts/config --disable SYSTEM_TRUSTED_KEYS
+scripts/config --disable MODULE_SIG_KEY
+make olddefconfig
+make -j $(nproc)
 sudo su
 INSTALL_MOD_STRIP=1 make modules_install
 make install
