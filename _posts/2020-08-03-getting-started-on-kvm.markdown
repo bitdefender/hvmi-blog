@@ -222,8 +222,21 @@ Using `virsh` edit the VM configuration as follows:
   ```xml
   <qemu:commandline>
     <qemu:arg value='-device'/>
-    <qemu:arg value='vhost-vsock-pci,id=bitdefender-vsock,guest-cid=321'/>
+    <qemu:arg value='vhost-vsock-pci,id=vsock,guest-cid=321'/>
+    <qemu:arg value='-chardev'/>
+    <qemu:arg value='socket,id=hvmi-socket,cid=321,port=1234,reconnect=3'/>
+    <qemu:arg value='-chardev'/>
+    <qemu:arg value='socket,id=hvmi-mem-socket,path=/var/lib/libvirt/qemu/mem-introspection-sock,server=on,wait=off'/>
+    <qemu:arg value='-object'/>
+    <qemu:arg value='introspection,id=hvmi,chardev=hvmi-socket,chardev-memintro=hvmi-mem-socket'/>
   </qemu:commandline>
+  ```
+
+* if this VM has 2 vCPUs and 8GB RAM and it should be able to introspect 50 guests with a maximum total memory of 500GB, you must add a `maxMemory` node (slots=3*max_guest, maxMemory=this_vm+max_total_memory) and a `NUMA` child node to the current `cpu` node (`<cpu .../>`):
+
+  ```xml
+  <maxMemory slots='150' unit='GiB'>508</maxMemory>
+  <cpu ...><numa><cell id='0' cpus='0-1' memory='8' unit='GiB'/></numa></cpu>
   ```
 
 ## Install a target (Windows, Linux) guest VM
@@ -263,9 +276,11 @@ Using `virsh` edit the VM configuration as follows:
   ```xml
   <qemu:commandline>
     <qemu:arg value='-chardev'/>
-    <qemu:arg value='socket,id=bitdefender-socket,cid=321,port=1234,reconnect=3'/>
+    <qemu:arg value='socket,id=hvmi-socket,cid=321,port=1234,reconnect=3'/>
+    <qemu:arg value='-chardev'/>
+    <qemu:arg value='socket,id=hvmi-mem-socket,path=/var/lib/libvirt/qemu/mem-introspection-sock,disconnected'/>
     <qemu:arg value='-object'/>
-    <qemu:arg value='introspection,id=bitdefender-kvmi,chardev=bitdefender-socket'/>
+    <qemu:arg value='introspection,id=hvmi,chardev=hvmi-socket,chardev-memsrc=hvmi-mem-socket'/>
   </qemu:commandline>
   ```
 
