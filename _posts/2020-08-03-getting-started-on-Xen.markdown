@@ -5,11 +5,11 @@ date:   2020-08-10 11:52:00 +0300
 author: Cristi Anichitei
 ---
 
-In the [previous blog post](/blog/introspection/2020/07/30/introduction.html) we talked about what HVMI is and how it works, and now we will talk about how to get the example daemon working with Xen 4.11. We will be using Ubuntu 20.04 as a development environment.
+In the [previous blog post](/hvmi-blog/introspection/2020/07/30/introduction.html) we talked about what HVMI is and how it works, and now we will talk about how to get the example daemon working with Xen 4.11. We will be using Ubuntu 20.04 as a development environment.
 
-For a KVM guide check [HVMI demo setup on KVM](/blog/2020/08/10/getting-started-on-kvm.html).
+For a KVM guide check [HVMI demo setup on KVM](/hvmi-blog/2020/08/10/getting-started-on-kvm.html).
 
-We will build and install the core introspection library (`libintrocore`), the [exceptions](https://github.com/hvmi/hvmi/tree/master/exceptions) and [guest support](https://github.com/hvmi/hvmi/tree/master/cami) files needed at runtime, and the example daemon (`hvmid`).
+We will build and install the core introspection library (`libintrocore`), the [exceptions](https://github.com/bitdefender/bitdefender/tree/master/exceptions) and [guest support](https://github.com/bitdefender/bitdefender/tree/master/cami) files needed at runtime, and the example daemon (`hvmid`).
 
 I'll be running HVMI inside a dedicated VM, but for Xen the results should be the same if HVMI is installed inside dom0.
 
@@ -31,7 +31,7 @@ pip install cmake
 First, we need to get HVMI:
 
 ```shell
-git clone --recurse-submodules https://github.com/hvmi/hvmi.git
+git clone --recurse-submodules https://github.com/bitdefender/hvmi.git
 ```
 
 Now we need to build `libintrocore`, and the exceptions and guest support files. All of these are handled by cmake:

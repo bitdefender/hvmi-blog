@@ -14,7 +14,7 @@ Hypervisor Memory Introspection, as its name implies, relies heavily an analyzin
 
 On x86, there are several resources that control virtual to physical address translation. The first stage of a virtual address translation is **segmentation**. During this step, the **guest virtual address** accessed by the instruction is added to the segment base used by the instruction, forming the **guest linear address**. The guest linear address is then translated by the **paging** mechanism into a **guest physical address**. The guest physical address is then translated via the EPT to a **host physical address**, which is then accessed by the hardware. This is illustrated in the following image:
 
-![Address translation on x86](/blog/assets/b07_translation.png)
+![Address translation on x86](/hvmi-blog/assets/b07_translation.png)
 
 When implementing virtual memory, the operating system builds both the descriptor table and the page tables which are responsible for address translation. While the descriptor table is global, hence its name, Global Descriptor Table, or GDT for short (albeit there can also be Local Descriptor Tables as well, but this is not the subject of this blog post) and is the same for the entire system (including all the processes and the kernel), the page-tables used by the processes are different for each process. This means that, for example, _svchost.exe_ and _calc.exe_ use different sets of page tables for their guest linear to guest physical address translation. Therefore, the same guest linear address will translate to different guest physical addresses in different processes. 
 
@@ -29,14 +29,14 @@ How are different page-tables used for different processes, though? The CPU alwa
 
 The paging steps are better illustrated in the following image:
 
-![4-Levels Paging on x86](/blog/assets/b07_paging.png)
+![4-Levels Paging on x86](/hvmi-blog/assets/b07_paging.png)
 
 
 ## Page Faults
 
 Each page-table entry has a well defined structure, and several bits have special meaning. While translating addresses, the CPU interprets these bits in order to see how it should proceed with the translation. First, let's see what control bits are present inside a page-table entry:
 
-![Page-Table Entry on x86](/blog/assets/b07_ptentry.png)
+![Page-Table Entry on x86](/hvmi-blog/assets/b07_ptentry.png)
 
 As we can see in the image above, there are several control bits, but only some of them are interesting to us right now:
 
@@ -101,7 +101,7 @@ Let us now assume that we wish to read the virtual page `0x00007FFF12340000` ins
 
 Let us now take a look at the page-table entries that translate this virtual address:
 
-![0x00007FFF12340000 translation](/blog/assets/b07_translation_ex.png)
+![0x00007FFF12340000 translation](/hvmi-blog/assets/b07_translation_ex.png)
 
 Looking at the image above, we can see that all page-table entries are present, except for the last level, the PT entry. The entries inside the PML4, PDP and PD are `0xBC067`, `0xBB067` and `0xBA067`, respectively, which indicate present, writable, user-accessible, accessed entries. In contrast, the PT entry is 0, which means that the entry is not present, and accessing it would lead to a #PF.
 
@@ -125,7 +125,7 @@ Looking at the example above, you might ask why is it needed to EPT hook all pag
 
 ## Reading swapped-out memory in HVMI
 
-Inside HVMI, reading swapped-out memory is implemented in the [swapmem.c](https://github.com/hvmi/hvmi/blob/master/introcore/src/guests/swapmem.c) file. The main function is [IntSwapMemReadData](https://github.com/hvmi/hvmi/blob/master/introcore/src/guests/swapmem.c#L417), which simply receives the input arguments, such as the CR3 of the target process, the virtual address and the size (which can be greater than a single page) to be read, and once all the data is available, it will call a user-supplied callback. Swap-in events are being handled by the [IntSwapMemPageSwappedIn](https://github.com/hvmi/hvmi/blob/master/introcore/src/guests/swapmem.c#L259) function, which is called by the HVMI core when a virtual page is swapped in. The following is a very simple example of how the command line of a process is read using this mechanism:
+Inside HVMI, reading swapped-out memory is implemented in the [swapmem.c](https://github.com/bitdefender/bitdefender/blob/master/introcore/src/guests/swapmem.c) file. The main function is [IntSwapMemReadData](https://github.com/bitdefender/bitdefender/blob/master/introcore/src/guests/swapmem.c#L417), which simply receives the input arguments, such as the CR3 of the target process, the virtual address and the size (which can be greater than a single page) to be read, and once all the data is available, it will call a user-supplied callback. Swap-in events are being handled by the [IntSwapMemPageSwappedIn](https://github.com/bitdefender/bitdefender/blob/master/introcore/src/guests/swapmem.c#L259) function, which is called by the HVMI core when a virtual page is swapped in. The following is a very simple example of how the command line of a process is read using this mechanism:
 
 ```C
 IntSwapMemReadData(pProcess->Cr3, 

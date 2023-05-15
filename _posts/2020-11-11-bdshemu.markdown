@@ -159,7 +159,7 @@ D2 07 01 61 8A 6D C1 E6 99 FA 98 29 13 2D 98 2C
 
 Saving this as a binary file as `shellcode.bin` and then viewing its contents yields a densely packed chunk of code, highly indicative of an encrypted shellcode:
 
-![The shellcode viewed in hex & binary](/blog/assets/b06_shellcode1.png)
+![The shellcode viewed in hex & binary](/hvmi-blog/assets/b06_shellcode1.png)
 
 Using the disasmtool provided in the bddisasm project, one can use the `-shemu` option to run the shellcode emulator on the input. 
 ```console
@@ -190,7 +190,7 @@ We can see that the last emulated instruction is `MOV       edx, dword ptr fs:[e
 
 These indicators are more than enough to conclude that the emulated code is, without a doubt, a shellcode. What's even more awesome about bdshemu is that generally, at the end of the emulation, the memory will contain the decrypted form of the shellcode. disasmtool is nice enough to save the shellcode memory once emulation is done - a new file, named `shellcode.bin_decoded.bin` is created which now contains the decoded shellcode; let's take a look at it:
 
-![The emulated shellcode](/blog/assets/b06_shellcode2.png)
+![The emulated shellcode](/hvmi-blog/assets/b06_shellcode2.png)
 
 Looking at the decoded shellcode, one can immediately see not only that it is different, but that is plain text - a keen eye will quickly identify the `calc.exe` string at the end of the shellcode, hinting us that it is a classic `calc.exe` spawning shellcode.
 

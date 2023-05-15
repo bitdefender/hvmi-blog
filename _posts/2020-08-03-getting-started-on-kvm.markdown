@@ -5,7 +5,7 @@ date:   2020-08-10 11:53:00 +0300
 author: Cristi Anichitei
 ---
 
-For a Xen guide check [HVMI demo setup on Xen](/blog/2020/08/10/getting-started-on-Xen.html).
+For a Xen guide check [HVMI demo setup on Xen](/hvmi-blog/2020/08/10/getting-started-on-Xen.html).
 
 Packer templates can be found in the [kvmi-templates](https://github.com/mdontu/kvmi-templates) repository.
 
@@ -146,7 +146,7 @@ sudo make install
 
 ```shell
 sudo apt install cmake libjsoncpp-dev
-git clone https://github.com/hvmi/hvmi.git
+git clone https://github.com/bitdefender/hvmi.git
 cd hvmi
 git submodule init
 git submodule update
@@ -251,7 +251,7 @@ Using `virsh` edit the VM configuration as follows:
 
 ## Install a target (Windows, Linux) guest VM
 
-The current release of [HVMI](https://github.com/hvmi/hvmi) has support for Windows 7 (SP1, SP2), Windows 10 1809 (RS5), Ubuntu Linux 18.04 and CentOS 8. After the installation is complete, power it off as it needs to be reconfigured.
+The current release of [HVMI](https://github.com/bitdefender/hvmi) has support for Windows 7 (SP1, SP2), Windows 10 1809 (RS5), Ubuntu Linux 18.04 and CentOS 8. After the installation is complete, power it off as it needs to be reconfigured.
 
 ## Reconfigure the target guest to enable KVMI
 
